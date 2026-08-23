@@ -5,6 +5,7 @@
 *.so
 *.dylib
 /bin/
+/lantern
 
 # Test binaries
 *.test
