@@ -29,5 +29,5 @@ messages follow Conventional Commits (`type(scope): summary`).
 ## Decision log
 
 Significant architecture or design decisions get a dated entry in
-`DECISIONS.md` (once it exists) — this project spans months with gaps between
-sessions, and that file is what survives the gap.
+`DECISIONS.md` — this project spans months with gaps between sessions, and
+that file is what survives the gap.
