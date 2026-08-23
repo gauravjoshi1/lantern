@@ -179,3 +179,58 @@ configured file can't be read, or parsing yields zero usable entries. This
 replaces the original #10 draft's "any malformed entry fails the whole
 load" choice, which traded away too much availability given Lantern is the
 only resolver on the network with no fallback if DNS goes down.
+
+## 2026-08-23 — Oversized cache-hit response
+
+A cache hit whose response exceeds the current UDP requester's effective
+payload limit is treated as a miss (fresh upstream exchange), not
+self-truncated by Lantern. Avoids building generic RR-aware response
+truncation — machinery Stage 1 deliberately doesn't have, per the earlier
+choice of Design 2 over full RRset caching.
+
+## 2026-08-23 — Upstream transport selection by downstream transport
+
+For a downstream client that queried over TCP, Lantern queries upstream
+directly over TCP rather than trying UDP first and falling back on
+truncation (RFC 5625). This is in addition to, not a replacement for, the
+existing "UDP/TCP response shaping" decision, which covers the downstream
+UDP case.
+
+## 2026-08-23 — Downstream TCP pipelining and upstream TCP connection lifecycle
+
+Downstream TCP connections process multiple pipelined queries serially —
+satisfies RFC 7766's pipelining requirement without out-of-order response
+bookkeeping. Upstream TCP connections are opened per exchange for Stage 1;
+connection reuse/pooling is deferred to a later issue, with the API kept
+replaceable.
+
+## 2026-08-23 — Signed queries (TSIG/SIG(0)) unsupported
+
+An incoming query signed with TSIG or SIG(0) is explicitly unsupported and
+rejected, not partially proxied. Forwarding a signed transaction through
+blocklist/cache logic risks silently invalidating its signature semantics,
+and Stage 1 has no way to guarantee it doesn't.
+
+## 2026-08-23 — Blocked-response Authority section
+
+The synthesized NXDOMAIN for a blocked domain leaves Authority empty — no
+fabricated SOA record. Lantern doesn't administer the blocked domain, so
+inventing plausible SOA fields is awkward; the cost is clients may re-query
+blocked domains more often than a real negative-cached answer would allow.
+
+## 2026-08-23 — Stage 1 accepted query shape
+
+Only the ordinary QUERY opcode is supported. QDCOUNT=0 and unsupported
+opcodes (UPDATE, NOTIFY, DSO, AXFR, IXFR) return NOTIMP. QDCOUNT>1 returns
+FORMERR (RFC 9619). AXFR/IXFR are also excluded from #8's transport
+contract specifically, since they can return multiple messages for one
+query, which #8 doesn't support.
+
+## 2026-08-23 — Shared response-construction component
+
+#9 (cache-hit + OPT), #10 (blocked NXDOMAIN), and #11 (FORMERR/NOTIMP/
+SERVFAIL/health responses) share one response-construction component
+rather than three separately-implemented encoders — the kind of drift
+across parallel implementations is what produced the health-check gap.
+Exact package/API shape is deferred to when implementation actually
+starts.
