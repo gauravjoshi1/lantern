@@ -114,6 +114,32 @@ restarting during an upstream/ISP outage can trip `systemd`'s own
 crash-loop protection and leave the unit fully stopped, which is worse than
 doing nothing.
 
+## 2026-08-23 — Health check bypass mechanism
+
+The health check's probe queries a cryptographically random label under the
+reserved `.invalid.` TLD (RFC 6761) — no operator-owned DNS infrastructure
+needed, since names under it are guaranteed to never be real. The probe
+travels through Lantern's actual pipeline (blocklist check, cache lookup,
+upstream exchange, response validation) via an internal trigger, not a
+separately-coded shortcut — reusing the real code path is what actually
+proves the listener-to-upstream wiring, not just resemblance to it. The
+probe is explicitly and narrowly exempted from blocklist matching (scoped to
+the internally-generated probe object specifically, not a broader flag a
+crafted packet could also trip). Its upstream exchange reuses #8's validated
+exchange logic (same anti-spoofing checks) but with its own, more patient
+`attemptTimeout`/`maxAttempts`, separate from client-facing values. A valid,
+matching `NXDOMAIN` is success.
+
+If Lantern ever implements RFC 6761's suggested local `.invalid` synthesis
+for ordinary client traffic, the health-check probe specifically must not
+go through that shortcut, or the mechanism silently defeats itself.
+
+Status flips to degraded after 3 consecutive failures, and back to healthy
+after 1 success (matching the common liveness/readiness convention). The
+check interval backs off, capped, while degraded, and resets to normal
+cadence on recovery. None of this ever triggers a process restart (see
+"Health check and restart policy" above).
+
 ## 2026-08-23 — Blocklist malformed-entry handling
 
 A malformed individual line in the blocklist file is skipped and logged
