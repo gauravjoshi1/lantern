@@ -75,3 +75,50 @@ Lantern can serve a client from cache — it bypasses the cache and requires a
 real round-trip to the upstream resolver to pass. Extends the existing
 reliability constraint that health checks must perform a real DNS
 resolution.
+
+## 2026-08-23 — EDNS/OPT cache policy
+
+Stage 1's cache strips the OPT record before storing a response and
+synthesizes a fresh OPT on every hit from the current requester's own
+advertised UDP payload size and DO bit, rather than caching OPT verbatim
+(RFC 6891 forbids this) or bypassing caching entirely for any EDNS-bearing
+query. Only OPT is excluded and rebuilt per-request; ordinary answer data is
+cached and shared across clients as usual. Full RRset caching — the
+structural fix real recursive resolvers use, where every response is
+synthesized from independently-cached records rather than stored as whole
+packets — is explicitly deferred to a later issue: it requires a response
+encoder Stage 1 doesn't have, and it would mean reconstructing responses
+from parsed fields on every hit, which conflicts with the "Stage 1 DNS
+model" decision above (preserve the original packet as closely as
+possible).
+
+## 2026-08-23 — UDP/TCP response shaping
+
+When the original downstream client queried over UDP and the real upstream
+answer only fits over TCP, Lantern does not perform an internal upstream TCP
+fetch on that client's behalf — it returns the already-truncated UDP
+response (`TC=1`) and lets the client decide to reconnect over TCP itself,
+per RFC 7766's same-transport-response rule. The general upstream TCP
+fallback for a truncated upstream UDP response (see "Stage 1 transport"
+above) still applies when the downstream client itself queried over TCP and
+can use the fuller answer.
+
+## 2026-08-23 — Health check and restart policy
+
+An upstream-reachability failure (the health check's upstream probe) only
+ever changes a reported status (logged/exposed as degraded) — it never
+triggers a process exit or a restart. Only a genuine liveness failure
+(deadlock, a dead listener socket) is wired to the hardware watchdog.
+Reserves restart for problems a restart can actually fix — repeatedly
+restarting during an upstream/ISP outage can trip `systemd`'s own
+crash-loop protection and leave the unit fully stopped, which is worse than
+doing nothing.
+
+## 2026-08-23 — Blocklist malformed-entry handling
+
+A malformed individual line in the blocklist file is skipped and logged
+(with its line number); loading continues. Startup only fails if the
+configured file can't be read, or parsing yields zero usable entries. This
+replaces the original #10 draft's "any malformed entry fails the whole
+load" choice, which traded away too much availability given Lantern is the
+only resolver on the network with no fallback if DNS goes down.
