@@ -140,6 +140,37 @@ check interval backs off, capped, while degraded, and resets to normal
 cadence on recovery. None of this ever triggers a process restart (see
 "Health check and restart policy" above).
 
+## 2026-08-23 — Health check: three-way split (corrects the entry above)
+
+The "Health check bypass mechanism" entry above has a gap: feeding a query
+into pipeline code via an internal trigger never actually traverses the
+bound socket, so it proves the pipeline logic and the upstream link work,
+but not that the listener/read-loop path is alive. A crash confined to the
+read/accept loop goroutine (not the process as a whole) would go undetected.
+
+Health is three separately-scoped checks, not one:
+
+1. **Process liveness** — hardware watchdog heartbeat, unchanged from
+   "Health check and restart policy." The only one allowed to restart.
+2. **Listener health (new)** — a genuine, independent DNS client role: its
+   own UDP and TCP sockets, dialing the address Lantern actually serves. It
+   may share wire-format helpers with the rest of the codebase but must
+   never call server-side handlers directly. Query name is fixed —
+   `listener-health.invalid.`, answered locally with NXDOMAIN — not
+   randomized, because a cache hit is a valid success here: this check
+   proves the client-facing socket and dispatch path work, not freshness or
+   upstream reachability, so cold-cache/expiry/eviction coupling to upstream
+   availability is exactly what a fixed name avoids. Has its own failure and
+   recovery counters and its own scheduling, separate from upstream health —
+   3 consecutive failures / 1 success are reasonable Stage 1 defaults, but
+   it does not reuse the upstream probe's backoff behavior. Starts as
+   internal defaults; if ever exposed as configuration, gets its own
+   distinctly-named settings rather than sharing the upstream probe's.
+3. **Upstream reachability** — the random-`.invalid` mechanism from the
+   entry above, unchanged in its own right. Bypassing the socket is correct
+   for this one, now that it's honestly scoped to only "is my configured
+   upstream reachable," not doubling as a listener test.
+
 ## 2026-08-23 — Blocklist malformed-entry handling
 
 A malformed individual line in the blocklist file is skipped and logged
