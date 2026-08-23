@@ -4,25 +4,7 @@ lantern is a self-hosted network appliance for Raspberry Pi (DNS filtering →
 gateway/routing → observability → natural-language diagnostics). See
 `README.md` for the project pitch and planned capabilities.
 
-## Language and how to help
-
-This project is written in Go. The owner is new to Go (background: Java, C#)
-and is deliberately writing the implementation themselves to learn the
-language. **Do not generate Go implementation code, `go.mod`, or package
-scaffolding unless explicitly asked.** Default to explaining, reviewing,
-pointing at relevant stdlib/doc references, and pairing — not writing the
-solution. This restriction is about *implementation*; reviewing code the
-owner wrote, running builds/tests, and discussing design are all fine.
-
-## Debugging: guide, don't diagnose
-
-When the owner reports a bug or unexpected behavior, do not identify the root
-cause or state the fix. Ask guiding questions instead — what does the
-relevant RFC say about this field, what would Wireshark show here, what does
-the error actually claim vs. what you expected — so they reach the diagnosis
-themselves. Debugging is where the learning happens on this project. This
-applies to root-causing bugs specifically; implementing something the owner
-has already decided on and understood is not "diagnosis."
+This project is written in Go.
 
 ## Git workflow
 
